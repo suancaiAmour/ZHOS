@@ -63,9 +63,15 @@ void *getConWithIndex(ZHQueue *cthis, unsigned int index)
 	}
 }
 
+void queueDealloc(ZHQueue *cthiss)
+{
+	myfree(cthiss->cache);
+}
+
 CTOR(ZHQueue, rootClass)
 FUNCTION_SETTING(init, queueInit);
 FUNCTION_SETTING(enQueue, enQueue);
 FUNCTION_SETTING(deQueue, deQueue);
 FUNCTION_SETTING(getConWithIndex, getConWithIndex);
+FUNCTION_SETTING(dealloc, queueDealloc);
 END_CTOR
