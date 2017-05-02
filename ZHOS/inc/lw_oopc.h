@@ -29,7 +29,6 @@ void type##_release(type* t);       \
 void type##_retain(type* t);        \
 struct type                         \
 {   								\
-     int referenceCount;            \
 
 #define END_ABS_CLASS };
 
@@ -40,6 +39,7 @@ void type##_ctor(type* cthis) {
 
 // 根类
 ABS_CLASS(rootClass)
+void *reserve;
 END_ABS_CLASS
 
 #define CLASS(type, Father)                 \
@@ -52,7 +52,8 @@ void type##_retain(type *t);        \
 struct type                         \
 {                                   \
     void (*dealloc)(type* cthis);   \
-    struct Father father;
+    struct Father father;			\
+	int referenceCount;            	\
 
 #define END_CLASS  };
 
@@ -60,7 +61,7 @@ struct type                         \
 type* type##_new(const char* describe)                  \
 {            											\
     struct type *cthis = (struct type*)lw_oopc_malloc(sizeof(struct type), #type, describe);   \
-    cthis->father.referenceCount = 1;                   \
+    cthis->referenceCount = 1;                   \
     if(!cthis)                                          \
     {                                                   \
         return 0;                                       \
@@ -68,17 +69,17 @@ type* type##_new(const char* describe)                  \
     type##_ctor(cthis);                                 \
     return cthis;                                       \
 }                                                       \
-void type##_release(type* cthis)                    \
-{                                                   \
-     if(--cthis->father.referenceCount == 0)         \
-     {                                               \
-         cthis->dealloc(cthis);                      \
-         lw_oopc_free(cthis);                        \
-     }                                               \
-}                                                   \
+void type##_release(type* cthis)                        \
+{                                                       \
+     if(--cthis->referenceCount == 0)                   \
+     {                                                  \
+         cthis->dealloc(cthis);                         \
+         lw_oopc_free(cthis);                           \
+     }                                                  \
+}                                                       \
 void type##_retain(type* cthis)                         \
 {                                                       \
-     cthis->father.referenceCount++;                    \
+     cthis->referenceCount++;                           \
 }                                                       \
 void type##dealloc11111(type* cthis){}                  \
 void type##_ctor(type* cthis) {                         \
