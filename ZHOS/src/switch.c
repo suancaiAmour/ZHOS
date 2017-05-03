@@ -16,7 +16,8 @@ typedef uint32_t INT32U;
 typedef struct TCB
 {
   uint32_t *pTaskStack;
-	uint16_t Delay;
+  uint16_t Delay;
+  uint32_t *freeAddr;
 }TCB;
 
 static ZHQueue *TCBQueue;
@@ -138,16 +139,15 @@ void CreateTask(void (*task)(void))
 		ZHLog("任务栈创建失败。\r\n");
 		return;
 	}
+	newTask = (TCB *)mymalloc(sizeof(TCB));
+	newTask->freeAddr = ptos;
     ptos += (TASK_TACK_DEEP - 1);                                          
     *(ptos)    = (INT32U)0x01000000L;             
     *(--ptos)  = (INT32U)task;
-	newTask = (TCB *)mymalloc(sizeof(TCB));
 	newTask->pTaskStack = ptos - 14;
 	newTask->Delay = 0;
-	
 	// 压入任务队列
 	TCBQueue->enQueue(TCBQueue, (void *)newTask);
-	
 	taskCount = TCBQueue->count;
 }
 
@@ -160,7 +160,7 @@ void TaskEnd(void)
 		task = TCBQueue->deQueue(TCBQueue);
 		if(task == TaskRuning)
 		{
-			myfree(task->pTaskStack + 14);
+			myfree(task->freeAddr);
 			myfree(task);
 			TaskNew = TCBQueue->deQueue(TCBQueue);
 			TCBQueue->enQueue(TCBQueue, TaskNew);
