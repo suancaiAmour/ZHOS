@@ -23,7 +23,14 @@ void SwitchTask(void)
 CTOR(OSClass, rootClass)
 FUNCTION_SETTING(log, ZHLog);
 FUNCTION_SETTING(createTask, CreateTask);
+FUNCTION_SETTING(createTaskWithTackDeep, CreateTaskWithTackDeep);
 FUNCTION_SETTING(endTask, TaskEnd);
 FUNCTION_SETTING(switchTask, SwitchTask);
 FUNCTION_SETTING(delay, SwitchDelay);
+FUNCTION_SETTING(getOSTime, getOSTickTime);
+
+FUNCTION_SETTING(createCond, createCond);
+FUNCTION_SETTING(releaseCond, releaseCond);
+FUNCTION_SETTING(condSignal, condSignal);
+FUNCTION_SETTING(condWait, condWait);
 END_CTOR

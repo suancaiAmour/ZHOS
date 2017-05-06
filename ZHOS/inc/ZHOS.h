@@ -12,13 +12,28 @@
 
 #define MEM_MAX_SIZE	40*1024 // 系统可支配 40K 字节 RAM
 
+#define ZHOSTask void (*)(void *)
+	
+CLASS(ZHOSCond, rootClass)
+int CondNum;
+END_CLASS
+
 CLASS(OSClass, rootClass)
 void (*log)(char *fmt, ...);
-void (*createTask)(void (*task)(void));
+void (*createTask)(void (*task)(void*), void *);
+void (*createTaskWithTackDeep)(void (*task)(void *), void *env, uint32_t tackDeep);
 void (*endTask)(void);
 void (*switchTask)(void);
 void (*delay)(uint16_t nTick);
+uint64_t (*getOSTime)(void);
+
+ZHOSCond* (*createCond)(int condNum);
+void (*releaseCond)(ZHOSCond *cond);
+void (*condSignal)(ZHOSCond *cond);
+int (*condWait)(ZHOSCond *cond, int64_t waitTime);
+
 END_CLASS
+
 
 extern OSClass *pZHOS;
 

@@ -10,6 +10,9 @@
 
 #define N_TICK_IN_SECOND  1000
 
+CTOR(ZHOSCond, rootClass)
+END_CTOR
+
 typedef uint32_t OS_STK;
 typedef uint32_t INT32U;
 
@@ -24,7 +27,8 @@ static ZHQueue *TCBQueue;
 static unsigned int taskCount;
 TCB  *TaskNew, *TaskRuning, *IdleTask;
 
-void TaskIdle() {
+void TaskIdle(void *env) 
+{
 	while(1)
 	{
 		__ASM("WFE");
@@ -78,10 +82,13 @@ NoSave
     ALIGN
 }
 
+static uint64_t sysTickTime = 0;
+
 void  SysTick_Handler (void)
 {   
 	uint8_t i;
 	TCB *task;
+	sysTickTime++;
 	for(i = 0; i < taskCount; i++)
 	{
 		task = TCBQueue->getConWithIndex(TCBQueue, i);
@@ -90,6 +97,11 @@ void  SysTick_Handler (void)
 			task->Delay--;
 		}
     }
+}
+
+uint64_t getOSTickTime(void)
+{
+	return sysTickTime;
 }
 
 void SwitchDelay(uint16_t nTick)
@@ -102,7 +114,7 @@ void SwitchDelay(uint16_t nTick)
 		task = TCBQueue->getConWithIndex(TCBQueue, i);
 		if(task->Delay == 0)
 		{
-			if(task == TaskRuning)
+			if(task == TaskRuning || task == IdleTask)
 			{
 				continue;
 			}
@@ -114,7 +126,7 @@ void SwitchDelay(uint16_t nTick)
 		}
 	 }
 	 
-	 if(task == TaskRuning)
+	 if(i == taskCount)
 	 {
 		 if (task->Delay != 0)
 		 {
@@ -125,15 +137,14 @@ void SwitchDelay(uint16_t nTick)
 	 TaskSwitch();
 }
 
-
-void CreateTask(void (*task)(void))
+void CreateTaskWithTackDeep(void (*task)(void *), void *env, uint32_t tackDeep)
 {
 	OS_STK *ptos; // 任务堆栈
 	TCB *newTask; // 新创建的任务类
 	if(NULL == task)
 		return;
 		
-	ptos = (OS_STK *)mymalloc(sizeof(OS_STK) * TASK_TACK_DEEP);
+	ptos = (OS_STK *)mymalloc(sizeof(OS_STK) * tackDeep);
 	if(NULL == ptos)
 	{
 		ZHLog("任务栈创建失败。\r\n");
@@ -144,11 +155,17 @@ void CreateTask(void (*task)(void))
     ptos += (TASK_TACK_DEEP - 1);                                          
     *(ptos)    = (INT32U)0x01000000L;             
     *(--ptos)  = (INT32U)task;
+	*(ptos - 6) = (INT32U)env;
 	newTask->pTaskStack = ptos - 14;
 	newTask->Delay = 0;
 	// 压入任务队列
 	TCBQueue->enQueue(TCBQueue, (void *)newTask);
 	taskCount = TCBQueue->count;
+}
+
+void CreateTask(void (*task)(void *), void *env)
+{
+	CreateTaskWithTackDeep(task, env, TASK_TACK_DEEP);
 }
 
 void TaskEnd(void)
@@ -176,9 +193,50 @@ void SwitchStart(void)
 	TCBQueue = ZHQueue_new("系统任务队列");
 	TCBQueue->init(TCBQueue, MAX_TASK); // 任务队列只能存 MAX_TASK 个任务 																 
 	__set_PSP(0); 															
-	CreateTask(TaskIdle);
+	CreateTask(TaskIdle, NULL);
 	IdleTask = (TCB *)TCBQueue->deQueue(TCBQueue);
 	TCBQueue->enQueue(TCBQueue, (void *)IdleTask);
 	SysTick_Config((SystemCoreClock / N_TICK_IN_SECOND) - 1);
+}
+
+ZHOSCond *createCond(int condNum)
+{
+	ZHOSCond *cond = ZHOSCond_new("协程条件变量");
+	cond->CondNum = condNum;
+	return cond;
+}
+
+void releaseCond(ZHOSCond *cond)
+{
+	ZHOSCond_release(cond);
+}
+
+void condSignal(ZHOSCond *cond)
+{
+	cond->CondNum--;
+}
+
+// 返回 0 表示 接收到条件变量
+// 返回 1 表示 超时
+// waitTime 为 -1 表示永久等待
+int condWait(ZHOSCond *cond, int64_t waitTime)
+{
+	uint64_t cuTime = getOSTickTime();
+	while(1)
+	{
+		if(cond->CondNum <= 0)
+		{
+			cond->CondNum++;
+			return 0;
+		}
+		else if(getOSTickTime() - cuTime >= waitTime)
+		{
+			return 1;
+		}
+		else
+		{
+			SwitchDelay(0);
+		}	
+	}
 }
 
